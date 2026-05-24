@@ -1,18 +1,5 @@
+import re
 import jdatetime
-
-
-def to_persian_digits(text: str) -> str:
-    mapping = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
-    return text.translate(mapping)
-
-def format_price(value) -> str:
-    if value is None:
-        return "نامشخص"
-    try:
-        formatted = f"{int(value):,}"
-        return to_persian_digits(formatted) + " تومان"
-    except (ValueError, TypeError):
-        return "نامشخص"
 
 LABELS = {
     "usd": "🇺🇸 دلار",
@@ -21,32 +8,45 @@ LABELS = {
     "coin": "🪙 سکه امامی",
 }
 
+def to_persian(text: str) -> str:
+    mapping = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+    return str(text).translate(mapping)
+
+def strip_html(value: str) -> str:
+    return re.sub(r"<[^>]+>", "", value).strip()
+
+def to_toman(rial_str: str) -> str:
+    try:
+        if not rial_str:
+            return "نامشخص"
+        rial = int(rial_str.replace(",", ""))
+        toman = rial // 10
+        return to_persian(f"{toman:,}") + " تومان"
+    except (ValueError, TypeError):
+        return "نامشخص"
+
 def format_prices_message(data: dict) -> str:
-    now = to_persian_digits(jdatetime.datetime.now().strftime("%H:%M - %Y/%m/%d"))
-    lines = [f"📊 قیمت‌های لحظه‌ای\n🕐 {now}\n"]
-
-    usd = data.get("usd")
-    eur = data.get("eur")
-    gold = data.get("gold")
-    coin = data.get("coin")
-
-    if usd:
-        lines.append(f"🇺🇸 دلار\nخرید: {format_price(usd.buy)}  |  فروش: {format_price(usd.sell)}")
-    if eur:
-        lines.append(f"🇪🇺 یورو\nخرید: {format_price(eur.buy)}  |  فروش: {format_price(eur.sell)}")
-    if gold:
-        lines.append(f"🥇 طلای ۱۸ عیار\n{format_price(gold._price)}")
-    if coin:
-        lines.append(f"🪙 سکه امامی\nخرید: {format_price(coin.buy)}  |  فروش: {format_price(coin.sell)}")
-
+    now = to_persian(jdatetime.datetime.now().strftime("%H:%M - %Y/%m/%d"))
+    lines = [f"📊 قیمت‌های لحظه‌ای\n🕐 {now}\n{'─' * 28}"]
+    for key, label in LABELS.items():
+        item = data.get(key)
+        if item:
+            price = to_toman(item["price"])
+            change = to_persian(strip_html(item["change"]))
+            pct = to_persian(strip_html(item["change_pct"]))
+            trend = "🔻" if "low" in item["change"] else "🔺"
+            lines.append(f"{label}\n{price}  {trend} {change} ({pct})")
+    lines.append('─' * 28)
     return "\n\n".join(lines)
 
 def format_single(key: str, data: dict) -> str:
-    now = to_persian_digits(jdatetime.datetime.now().strftime("%H:%M - %Y/%m/%d"))
     item = data.get(key)
     label = LABELS.get(key, key)
+    now = to_persian(jdatetime.datetime.now().strftime("%H:%M - %Y/%m/%d"))
     if item is None:
-        return f"📊 {label}\n🕐 {now}\n\n❌ اطلاعات در دسترس نیست"
-    if hasattr(item, 'buy'):
-        return f"📊 {label}\n🕐 {now}\n\nخرید: {format_price(item.buy)}  |  فروش: {format_price(item.sell)}"
-    return f"📊 {label}\n🕐 {now}\n{'─' * 28}\n{format_price(item._price)}"
+        return f"{label}\n❌ اطلاعات در دسترس نیست"
+    price = to_toman(item["price"])
+    change = to_persian(strip_html(item["change"]))
+    pct = to_persian(strip_html(item["change_pct"]))
+    trend = "🔻" if "low" in item["change"] else "🔺"
+    return f"📊 {label}\n🕐 {now}\n\n{price}\n{trend} {change} ({pct})"
