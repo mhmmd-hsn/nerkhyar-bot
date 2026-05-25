@@ -71,7 +71,8 @@ async def on_message(message: Message):
             await client.edit_message(
                 loading.chat.id,
                 loading.message_id,
-                "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن."
+                "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", 
+                components=build_keyboard(is_start=True)
             )
             return
         await client.edit_message(
@@ -91,7 +92,7 @@ async def on_callback(callback: CallbackQuery):
         await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
         data = fetch_prices()
         if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.")
+            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", components=build_keyboard(is_start=True))
             return
         await _edit(callback, format_prices_message(data), build_keyboard())
 
@@ -101,7 +102,7 @@ async def on_callback(callback: CallbackQuery):
         await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
         data = fetch_prices()
         if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.")
+            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", components=build_keyboard(is_start=True))
             return
         await _edit(callback, format_single(key, data), build_keyboard(current=key))
 
@@ -111,6 +112,6 @@ async def on_callback(callback: CallbackQuery):
         await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
         data = fetch_prices()
         if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.")
+            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", components=build_keyboard(is_start=True))
             return
         await _edit(callback, format_single(key, data), build_keyboard(current=key))
