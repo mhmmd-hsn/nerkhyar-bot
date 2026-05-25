@@ -12,12 +12,14 @@ def setup_db(monkeypatch):
     if os.path.exists(TEST_DB):
         os.remove(TEST_DB)
 
+
 def test_upsert_new_user():
     database.upsert_user(1, "testuser")
     with database.get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE user_id = 1").fetchone()
     assert row is not None
-    assert row[1] == "testuser"
+    assert row["username"] == "testuser"
+
 
 def test_upsert_updates_existing_user():
     database.upsert_user(1, "oldname")
@@ -25,7 +27,8 @@ def test_upsert_updates_existing_user():
     with database.get_connection() as conn:
         rows = conn.execute("SELECT * FROM users WHERE user_id = 1").fetchall()
     assert len(rows) == 1
-    assert rows[0][1] == "newname"
+    assert rows[0]["username"] == "newname"
+
 
 def test_log_command():
     database.upsert_user(1, "testuser")
@@ -33,4 +36,4 @@ def test_log_command():
     with database.get_connection() as conn:
         row = conn.execute("SELECT * FROM commands WHERE user_id = 1").fetchone()
     assert row is not None
-    assert row[2] == "/price"
+    assert row["command"] == "/price"

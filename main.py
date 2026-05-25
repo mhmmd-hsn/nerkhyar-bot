@@ -1,4 +1,4 @@
-from src.bot import main
+from src.bot import client
 
 if __name__ == "__main__":
-    main()
+    client.run()

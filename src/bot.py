@@ -8,17 +8,7 @@ from src.database import init_db, upsert_user, log_command
 client = Bot(token=BOT_TOKEN)
 
 
-def build_start_keyboard() -> InlineKeyboardMarkup:
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🇺🇸 دلار", callback_data="price_usd"))
-    markup.add(InlineKeyboardButton("🇪🇺 یورو", callback_data="price_eur"), row=2)
-    markup.add(InlineKeyboardButton("🥇 طلا", callback_data="price_gold"), row=3)
-    markup.add(InlineKeyboardButton("🪙 سکه", callback_data="price_coin"), row=4)
-    markup.add(InlineKeyboardButton("📊 مشاهده همه", callback_data="refresh"), row=5)
-    return markup
-
-
-def build_keyboard(current: str = None) -> InlineKeyboardMarkup:
+def build_keyboard(current: str = None, is_start: bool = False) -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup()
 
     if current is None:
@@ -26,7 +16,8 @@ def build_keyboard(current: str = None) -> InlineKeyboardMarkup:
         markup.add(InlineKeyboardButton("🇪🇺 یورو", callback_data="price_eur"), row=2)
         markup.add(InlineKeyboardButton("🥇 طلا", callback_data="price_gold"), row=3)
         markup.add(InlineKeyboardButton("🪙 سکه", callback_data="price_coin"), row=4)
-        markup.add(InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh"), row=5)
+        label = "📊 مشاهده همه" if is_start else "🔄 به‌روزرسانی"
+        markup.add(InlineKeyboardButton(label, callback_data="refresh"), row=5)
     else:
         buttons = {
             "usd": "🇺🇸 دلار",
@@ -68,7 +59,7 @@ async def on_message(message: Message):
         await message.reply(
             "سلام! 👋\nبا این ربات می‌تونی قیمت لحظه‌ای ارز و طلا رو ببینی.\n\n"
             "از دستور /price استفاده کن یا روی دکمه‌ها بزن.",
-            components=build_start_keyboard()
+            components=build_keyboard(is_start=True)
         )
 
     elif message.content == "/price":
@@ -123,7 +114,3 @@ async def on_callback(callback: CallbackQuery):
             await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.")
             return
         await _edit(callback, format_single(key, data), build_keyboard(current=key))
-
-
-def main():
-    client.run()

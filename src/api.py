@@ -11,7 +11,7 @@ ENDPOINTS = {
     "coin": "https://api.tgju.org/v1/market/indicator/summary-table-data/sekee",
 }
 
-def fetch_single(key: str, url: str, retries: int = 3) -> dict | None:
+def fetch_single(url: str, retries: int = 3) -> dict | None:
     for attempt in range(retries):
         try:
             response = requests.get(url, headers=HEADERS, timeout=15)
@@ -30,7 +30,7 @@ def fetch_single(key: str, url: str, retries: int = 3) -> dict | None:
 def fetch_prices() -> dict | None:
     result = {}
     for key, url in ENDPOINTS.items():
-        item = fetch_single(key, url)
+        item = fetch_single(url)
         if item is None:
             return None
         result[key] = item
