@@ -25,6 +25,7 @@ pluggy==1.6.0
 propcache==0.5.2
 Pygments==2.20.0
 pytest==9.0.3
+pytest-asyncio==1.4.0
 python-bale-bot==2.5.0
 python-dotenv==1.2.2
 requests==2.34.2

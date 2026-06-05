@@ -1,10 +1,10 @@
 from bale import Bot, Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, MenuKeyboardMarkup, MenuKeyboardButton
-
+from src.rate_limiter import is_allowed
 from src.config import BOT_TOKEN
-from src.api import fetch_prices
+import asyncio
 from src.formatter import format_prices_message, format_single
 from src.database import init_db, upsert_user, log_command
-
+from src.api import fetch_prices, start_price_updater
 client = Bot(token=BOT_TOKEN)
 
 
@@ -52,10 +52,12 @@ async def _edit(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMark
     )
 
 
+
 @client.event
 async def on_ready():
     print(f"{client.user.username} is running...")
     init_db()
+    asyncio.create_task(start_price_updater())
 
 
 @client.event
@@ -93,6 +95,9 @@ async def on_message(message: Message):
 @client.event
 async def on_callback(callback: CallbackQuery):
     upsert_user(callback.from_user.id, callback.from_user.username or "")
+    
+    if not is_allowed(callback.from_user.id):
+        return
 
     if callback.data == "refresh":
         log_command(callback.from_user.id, "refresh")

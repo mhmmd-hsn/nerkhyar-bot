@@ -1,4 +1,5 @@
 import time
+import asyncio
 import logging
 import requests
 
@@ -17,20 +18,20 @@ ENDPOINTS = {
     "coin": "https://api.tgju.org/v1/market/indicator/summary-table-data/sekee",
 }
 
-CACHE_TTL = 120
+CACHE_TTL = 60
 
 _cache: dict = {
     "data": None,
     "timestamp": 0.0,
 }
 
+_last_notification: float = 0.0
+NOTIFICATION_COOLDOWN = 300
+
 
 def _is_cache_valid() -> bool:
     return _cache["data"] is not None and (time.time() - _cache["timestamp"]) < CACHE_TTL
 
-
-_last_notification: float = 0.0
-NOTIFICATION_COOLDOWN = 300
 
 def _notify_admin(message: str):
     global _last_notification
@@ -85,17 +86,24 @@ def fetch_prices() -> dict | None:
     if _is_cache_valid():
         logger.debug("Returning cached prices")
         return _cache["data"]
+    return _cache["data"]
 
-    logger.info("Cache expired or empty, fetching fresh prices")
+
+def _refresh_cache():
     result = {}
     for key, url in ENDPOINTS.items():
         item = fetch_single(url)
         if item is None:
-            logger.error(f"Failed to fetch {key}, returning last cached data if available")
-            return _cache["data"]
+            _notify_admin(f"Health check failed: could not fetch {key} from TGJU")
+            logger.error(f"Health check failed for {key}")
+            return
         result[key] = item
-
     _cache["data"] = result
     _cache["timestamp"] = time.time()
-    logger.info("Prices updated and cached successfully")
-    return result
+    logger.info("Cache refreshed successfully")
+
+
+async def start_price_updater():
+    while True:
+        _refresh_cache()
+        await asyncio.sleep(CACHE_TTL)
