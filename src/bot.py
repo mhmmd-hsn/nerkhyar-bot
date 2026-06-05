@@ -1,10 +1,13 @@
-from bale import Bot, Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, MenuKeyboardMarkup, MenuKeyboardButton
-from src.rate_limiter import is_allowed
-from src.config import BOT_TOKEN
 import asyncio
+
+from bale import Bot, Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, MenuKeyboardMarkup, MenuKeyboardButton
+
+from src.config import BOT_TOKEN
+from src.api import fetch_prices, start_price_updater
 from src.formatter import format_prices_message, format_single
 from src.database import init_db, upsert_user, log_command
-from src.api import fetch_prices, start_price_updater
+from src.rate_limiter import is_allowed
+
 client = Bot(token=BOT_TOKEN)
 
 
@@ -52,6 +55,16 @@ async def _edit(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMark
     )
 
 
+async def _show_prices(send_fn, current: str = None, is_start: bool = False):
+    data = fetch_prices()
+    if data is None:
+        await send_fn("⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", build_keyboard(is_start=is_start))
+        return
+    if current:
+        await send_fn(format_single(current, data), build_keyboard(current=current))
+    else:
+        await send_fn(format_prices_message(data), build_keyboard())
+
 
 @client.event
 async def on_ready():
@@ -67,7 +80,7 @@ async def on_message(message: Message):
         log_command(message.from_user.id, "/start")
         await message.reply(
             "سلام! 👋\nبا این ربات می‌تونی قیمت لحظه‌ای ارز و طلا رو ببینی.\n\n"
-            "از دستور /price استفاده کن یا روی دکمه‌ مشاهده قیمت ها بزن.",
+            "از دستور /price استفاده کن یا روی دکمه مشاهده قیمت‌ها بزن.",
             components=build_menu_keyboard()
         )
 
@@ -75,55 +88,30 @@ async def on_message(message: Message):
         upsert_user(message.from_user.id, message.from_user.username or "")
         log_command(message.from_user.id, "/price")
         loading = await message.reply("⏳ در حال دریافت قیمت‌ها...")
-        data = fetch_prices()
-        if data is None:
-            await client.edit_message(
-                loading.chat.id,
-                loading.message_id,
-                "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.",
-                components=build_keyboard(is_start=True)
-            )
-            return
-        await client.edit_message(
-            loading.chat.id,
-            loading.message_id,
-            format_prices_message(data),
-            components=build_keyboard()
-        )
+
+        async def edit_loading(text, keyboard=None):
+            await client.edit_message(loading.chat.id, loading.message_id, text, components=keyboard)
+
+        await _show_prices(edit_loading)
 
 
 @client.event
 async def on_callback(callback: CallbackQuery):
     upsert_user(callback.from_user.id, callback.from_user.username or "")
-    
+
     if not is_allowed(callback.from_user.id):
         return
+
+    send = lambda text, kb=None: _edit(callback, text, kb)
 
     if callback.data == "refresh":
         log_command(callback.from_user.id, "refresh")
         await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
-        data = fetch_prices()
-        if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", build_keyboard(is_start=True))
-            return
-        await _edit(callback, format_prices_message(data), build_keyboard())
+        await _show_prices(send)
 
-    elif callback.data.startswith("refresh_"):
-        key = callback.data.replace("refresh_", "")
-        log_command(callback.from_user.id, f"refresh_{key}")
+    elif callback.data.startswith(("refresh_", "price_")):
+        prefix = "refresh_" if callback.data.startswith("refresh_") else "price_"
+        key = callback.data.replace(prefix, "")
+        log_command(callback.from_user.id, callback.data)
         await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
-        data = fetch_prices()
-        if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", build_keyboard(is_start=True))
-            return
-        await _edit(callback, format_single(key, data), build_keyboard(current=key))
-
-    elif callback.data.startswith("price_"):
-        key = callback.data.replace("price_", "")
-        log_command(callback.from_user.id, f"inline_{key}")
-        await _edit(callback, "⏳ در حال دریافت قیمت‌ها...")
-        data = fetch_prices()
-        if data is None:
-            await _edit(callback, "⚠️ دریافت قیمت‌ها با خطا مواجه شد. لطفاً دوباره تلاش کن.", build_keyboard(is_start=True))
-            return
-        await _edit(callback, format_single(key, data), build_keyboard(current=key))
+        await _show_prices(send, current=key)

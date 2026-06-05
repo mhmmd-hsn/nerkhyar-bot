@@ -1,11 +1,14 @@
 from src.formatter import to_toman, to_persian, strip_html, format_prices_message, format_single
 
-def make_data():
+def make_data(is_stale: bool = False):
     return {
-        "usd": {"price": "1,792,100", "change": '<span class="low">16600</span>', "change_pct": '<span class="low">0.94%</span>'},
-        "eur": {"price": "2,080,700", "change": '<span class="low">17400</span>', "change_pct": '<span class="low">0.84%</span>'},
-        "gold": {"price": "191,498,000", "change": '<span class="high">5914000</span>', "change_pct": '<span class="high">3.19%</span>'},
-        "coin": {"price": "1,909,850,000", "change": '<span class="low">40200000</span>', "change_pct": '<span class="low">2.13%</span>'},
+        "data": {
+            "usd": {"price": "1,792,100", "change": '<span class="low">16600</span>', "change_pct": '<span class="low">0.94%</span>'},
+            "eur": {"price": "2,080,700", "change": '<span class="low">17400</span>', "change_pct": '<span class="low">0.84%</span>'},
+            "gold": {"price": "191,498,000", "change": '<span class="high">5914000</span>', "change_pct": '<span class="high">3.19%</span>'},
+            "coin": {"price": "1,909,850,000", "change": '<span class="low">40200000</span>', "change_pct": '<span class="low">2.13%</span>'},
+        },
+        "is_stale": is_stale,
     }
 
 def test_to_persian_digits():

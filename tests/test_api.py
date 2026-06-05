@@ -1,13 +1,14 @@
 import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from src.api import fetch_single, fetch_prices, _cache, _refresh_cache
-import requests
 
 MOCK_RESPONSE = {
     "data": [
         ["1,792,100", "x", "x", "x", '<span class="low">16600</span>', '<span class="low">0.94%</span>']
     ]
 }
+
 
 @pytest.fixture(autouse=True)
 def reset_cache():
@@ -42,19 +43,42 @@ def test_fetch_single_network_error():
 
 
 def test_fetch_single_api_structure_changed_key_error():
-    broken_response = {"wrong_key": []}
     with patch("src.api.requests.get") as mock_get:
-        mock_get.return_value = make_mock_response(broken_response)
+        mock_get.return_value = make_mock_response({"wrong_key": []})
         result = fetch_single("https://fake-url.com", retries=1)
         assert result is None
 
 
 def test_fetch_single_api_structure_changed_index_error():
-    broken_response = {"data": []}
     with patch("src.api.requests.get") as mock_get:
-        mock_get.return_value = make_mock_response(broken_response)
+        mock_get.return_value = make_mock_response({"data": []})
         result = fetch_single("https://fake-url.com", retries=1)
         assert result is None
+
+
+def test_fetch_single_retries_on_network_error():
+    with patch("src.api.requests.get") as mock_get:
+        mock_get.side_effect = [
+            requests.RequestException("timeout"),
+            requests.RequestException("timeout"),
+            make_mock_response(MOCK_RESPONSE),
+        ]
+        result = fetch_single("https://fake-url.com", retries=3)
+        assert result is not None
+        assert mock_get.call_count == 3
+
+
+def test_fetch_single_returns_none_after_all_retries_fail():
+    with patch("src.api.requests.get") as mock_get:
+        mock_get.side_effect = requests.RequestException("timeout")
+        result = fetch_single("https://fake-url.com", retries=3)
+        assert result is None
+        assert mock_get.call_count == 3
+
+
+def test_fetch_prices_returns_none_when_cache_empty():
+    result = fetch_prices()
+    assert result is None
 
 
 def test_fetch_prices_returns_cache_when_valid():
@@ -63,12 +87,23 @@ def test_fetch_prices_returns_cache_when_valid():
     with patch("src.api.requests.get") as mock_get:
         result = fetch_prices()
         mock_get.assert_not_called()
-        assert result == _cache["data"]
+        assert result is not None
+        assert result["is_stale"] is False
 
 
-def test_fetch_prices_returns_none_when_cache_empty():
+def test_fetch_prices_returns_stale_when_cache_expired():
+    _cache["data"] = {"usd": {"price": "1,000", "change": "x", "change_pct": "x"}}
+    _cache["timestamp"] = 0.0
     result = fetch_prices()
-    assert result is None
+    assert result is not None
+    assert result["is_stale"] is True
+
+
+def test_fetch_prices_returns_none_when_cache_empty_and_fetch_fails():
+    with patch("src.api.fetch_single") as mock_fetch:
+        mock_fetch.return_value = None
+        result = fetch_prices()
+        assert result is None
 
 
 def test_refresh_cache_success():
@@ -93,35 +128,17 @@ def test_refresh_cache_failure_keeps_old_cache():
 
 def test_notify_admin_respects_cooldown():
     with patch("src.api.requests.post") as mock_post:
-        from src.api import _notify_admin
         import src.api as api_module
         api_module._last_notification = 99999999999.0
+        from src.api import _notify_admin
         _notify_admin("test message")
         mock_post.assert_not_called()
 
 
 def test_notify_admin_sends_when_cooldown_passed():
     with patch("src.api.requests.post") as mock_post:
-        from src.api import _notify_admin
         import src.api as api_module
         api_module._last_notification = 0.0
+        from src.api import _notify_admin
         _notify_admin("test message")
         mock_post.assert_called_once()
-
-def test_fetch_single_retries_on_network_error():
-    with patch("src.api.requests.get") as mock_get:
-        mock_get.side_effect = [
-            requests.RequestException("timeout"),
-            requests.RequestException("timeout"),
-            make_mock_response(MOCK_RESPONSE),
-        ]
-        result = fetch_single("https://fake-url.com", retries=3)
-        assert result is not None
-        assert mock_get.call_count == 3
-
-def test_fetch_single_returns_none_after_all_retries_fail():
-    with patch("src.api.requests.get") as mock_get:
-        mock_get.side_effect = requests.RequestException("timeout")
-        result = fetch_single("https://fake-url.com", retries=3)
-        assert result is None
-        assert mock_get.call_count == 3

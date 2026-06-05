@@ -1,7 +1,7 @@
 import re
 import jdatetime
 
-SEPARATOR = "─" * 17
+SEPARATOR = "─" * 28
 
 LABELS = {
     "usd": "🇺🇸 دلار",
@@ -10,12 +10,15 @@ LABELS = {
     "coin": "🪙 سکه امامی",
 }
 
+
 def to_persian(text: str) -> str:
     mapping = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
     return str(text).translate(mapping)
 
+
 def strip_html(value: str) -> str:
     return re.sub(r"<[^>]+>", "", value).strip()
+
 
 def to_toman(rial_str: str) -> str:
     try:
@@ -27,8 +30,10 @@ def to_toman(rial_str: str) -> str:
     except (ValueError, TypeError):
         return "نامشخص"
 
+
 def now_shamsi() -> str:
     return to_persian(jdatetime.datetime.now().strftime("%H:%M - %Y/%m/%d"))
+
 
 def _format_item(item: dict) -> str:
     price = to_toman(item["price"])
@@ -37,19 +42,32 @@ def _format_item(item: dict) -> str:
     trend = "🔻" if "low" in item["change"] else "🔺"
     return f"{price}  {trend} تغییر نسبت به دیروز: {change} ({pct})"
 
+
 def format_prices_message(data: dict) -> str:
-    lines = [f"📊 قیمت‌های لحظه‌ای\n🕐 {now_shamsi()}\n{SEPARATOR}"]
+    is_stale = data.get("is_stale", False)
+    header = (
+        f"⚠️ به دلیل خطا، دسترسی به قیمت‌های لحظه‌ای ممکن نیست.\n"
+        f"قیمت‌های زیر آخرین اطلاعات موجود هستند و ممکن است قدیمی باشند.\n{SEPARATOR}"
+        if is_stale
+        else f"📊 قیمت‌های لحظه‌ای\n🕐 {now_shamsi()}\n{SEPARATOR}"
+    )
+    lines = [header]
     for key, label in LABELS.items():
-        item = data.get(key)
+        item = data["data"].get(key)
         if item:
             lines.append(f"{label}\n{_format_item(item)}")
     lines.append(SEPARATOR)
     return "\n\n".join(lines)
 
+
 def format_single(key: str, data: dict) -> str:
-    item = data.get(key)
+    item = data["data"].get(key)
     label = LABELS.get(key, key)
-    header = f"📊 {label}\n🕐 {now_shamsi()}\n{SEPARATOR}"
+    is_stale = data.get("is_stale", False)
+
     if item is None:
-        return f"{header}\n\n❌ اطلاعات در دسترس نیست"
-    return f"{header}\n\n{_format_item(item)}"
+        return f"{label}\n❌ اطلاعات در دسترس نیست"
+
+    time_line = "⚠️ قیمت قدیمی — دسترسی به قیمت لحظه‌ای ممکن نیست" if is_stale else f"🕐 {now_shamsi()}"
+
+    return f"📊 {label}\n{time_line}\n\n{_format_item(item)}"

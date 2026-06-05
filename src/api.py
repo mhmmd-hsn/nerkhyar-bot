@@ -19,6 +19,7 @@ ENDPOINTS = {
 }
 
 CACHE_TTL = 60
+NOTIFICATION_COOLDOWN = 300
 
 _cache: dict = {
     "data": None,
@@ -26,7 +27,6 @@ _cache: dict = {
 }
 
 _last_notification: float = 0.0
-NOTIFICATION_COOLDOWN = 300
 
 
 def _is_cache_valid() -> bool:
@@ -83,10 +83,12 @@ def fetch_single(url: str, retries: int = 3) -> dict | None:
 
 
 def fetch_prices() -> dict | None:
-    if _is_cache_valid():
-        logger.debug("Returning cached prices")
-        return _cache["data"]
-    return _cache["data"]
+    if _cache["data"] is None:
+        return None
+    return {
+        "data": _cache["data"],
+        "is_stale": not _is_cache_valid(),
+    }
 
 
 def _refresh_cache():
